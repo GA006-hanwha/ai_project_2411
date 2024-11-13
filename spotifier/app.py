@@ -54,7 +54,7 @@ def login():
 
 @app.route('/play')
 def play_music():
-    items = request.args.get('items')
+    items = request.args.get('items', "Spring,Summer,Autumn,Winter")
     tracks = []
 
     for idx, i in enumerate(items.split(',')):
@@ -66,7 +66,9 @@ def play_music():
             uri = items[0]['uri']
             track_id = uri.split(':')[2]
             tracks.append(track_id)
-            print(track_id)
+            print(f'track_id : {track_id}')
+        else:
+            print(f'skip for {i}')
 
     # results = sp.search(q='우울한 출근길', limit=1)
     # items = results['tracks']['items']
@@ -79,7 +81,8 @@ def play_music():
 
 
     track_info = sp.track(track_id)
-    print(track_info)
+    print(f'track_info:{track_info}')
+    print(f'tracks={len(tracks)}')
     # preview_url = track_info['preview_url']
 
     user = sp.current_user()
@@ -96,7 +99,7 @@ def play_music():
     #     print("미리듣기 URL이 없습니다.")
 
     track_uri = request.args.get('track_uri')
-    iframe=f'<iframe src="https://open.spotify.com/embed/playlist/{playlist_id}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>'
+    iframe=f'<iframe src="https://open.spotify.com/embed/playlist/{playlist_id}" width="300" height="640" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>'
     print(f'iframe:{iframe}')
     return f'<html><body>Hello{iframe}</body></html>'
     return f'<html><body>Hello<iframe src="https://open.spotify.com/embed/track/{track_id}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe></body></html>'
