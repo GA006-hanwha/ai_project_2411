@@ -3,7 +3,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import dotenv
 import os
 
-from flask import Flask, request
+from flask import Flask, request, redirect, session
 
 dotenv.load_dotenv()
 # Spotify 개발자 대시보드에서 발급받은 값들
@@ -12,6 +12,7 @@ client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
 redirect_url='http://localhost:8888/callback'
 
 scope = 'user-read-private user-read-playback-state user-modify-playback-state'
+scope = 'user-read-private user-read-playback-state user-modify-playback-state playlist-modify-public'
 
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth( 
     client_id=client_id, 
@@ -22,25 +23,82 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
 
 app = Flask(__name__)
 
+@app.route('/callback/')
+def callback():
+    sp_oauth = SpotifyOAuth(client_id=client_id,
+                            client_secret=client_secret,
+                            redirect_uri=redirect_url,
+                            scope=scope)
+    code = request.args.get('code')
+    token_info = sp_oauth.get_access_token(code)
+
+    # 토큰 정보 저장 (session 또는 데이터베이스)
+    session['token_info'] = token_info
+
+    # 사용자 정보 가져오기 (예시)
+    sp = spotipy.Spotify(auth=token_info['access_token'])
+    user = sp.current_user()
+    print(user['display_name'])
+
+    return redirect('/play')  # 인증 후 이동할 페이지
+
+@app.route('/login')
+def login():
+  sp_oauth = SpotifyOAuth(client_id=client_id, 
+                          client_secret=client_secret, 
+                          redirect_uri=redirect_url, 
+                          scope=scope)
+  auth_url = sp_oauth.get_authorize_url()
+
+  return redirect(auth_url)
+
 @app.route('/play')
 def play_music():
-    results = sp.search(q='경쾌한 퇴근길', limit=1)
-    items = results['tracks']['items']
-    if items:
-        uri = items[0]['uri']
-        track_id = uri.split(':')[2]
-        print(track_id)
+    items = request.args.get('items')
+    tracks = []
+
+    for idx, i in enumerate(items.split(',')):
+        i=i.strip()
+        print(f"[{idx}] {i}")
+        results = sp.search(q=i, limit=1)
+        items = results['tracks']['items']
+        if items:
+            uri = items[0]['uri']
+            track_id = uri.split(':')[2]
+            tracks.append(track_id)
+            print(track_id)
+
+    # results = sp.search(q='우울한 출근길', limit=1)
+    # items = results['tracks']['items']
+    # if items:
+    #     uri = items[0]['uri']
+    #     track_id = uri.split(':')[2]
+    #     tracks.append(track_id)
+    #     print(track_id)
+    
+
 
     track_info = sp.track(track_id)
     print(track_info)
-    preview_url = track_info['preview_url']
+    # preview_url = track_info['preview_url']
 
-    if preview_url:
-        print(preview_url)
-    else:
-        print("미리듣기 URL이 없습니다.")
+    user = sp.current_user()
+    user_id = user['id']
+    playlist = sp.user_playlist_create(user=user_id, name='newsmusic', public=True)
+    playlist_id = playlist['id']
+    results = sp.playlist_add_items(playlist_id, tracks)
+    print('created playlist:', playlist_id)
+    print(results)
+
+    # if preview_url:
+    #     print(preview_url)
+    # else:
+    #     print("미리듣기 URL이 없습니다.")
 
     track_uri = request.args.get('track_uri')
+    iframe=f'<iframe src="https://open.spotify.com/embed/playlist/{playlist_id}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>'
+    print(f'iframe:{iframe}')
+    return f'<html><body>Hello{iframe}</body></html>'
     return f'<html><body>Hello<iframe src="https://open.spotify.com/embed/track/{track_id}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe></body></html>'
     # sp.start_playback(uris=[preview_url])
     return '''<html><head>
